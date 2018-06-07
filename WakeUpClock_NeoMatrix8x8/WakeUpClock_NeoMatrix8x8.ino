@@ -1,6 +1,6 @@
 /*
-   WORD CLOCK - 8x8 NeoPixel Desktop Edition
-   by Andy Doro
+   WAKE UP CLOCK - 8x8 NeoPixel Desktop Edition
+   Forked from WORD CLOCK by Andy Doro
 
    A word clock using NeoPixel RGB LEDs for a color shift effect.
 
@@ -81,6 +81,19 @@ uint64_t mask;
 #define TWELVE   mask |= 0xF600
 #define ANDYDORO mask |= 0x8901008700000000
 
+// define masks for each number
+#define PICO_ZERO  075557
+#define PICO_ONE   062227
+#define PICO_TWO   071747
+#define PICO_THREE 071317
+#define PICO_FOUR  055711
+#define PICO_FIVE  074717
+#define PICO_SIX   044757
+#define PICO_SEVEN 071111
+#define PICO_EIGHT 075757
+#define PICO_NINE  075711
+#define PICO_COLON 002020
+
 // define pins
 #define NEOPIN 8  // connect to DIN on NeoMatrix 8x8
 #define RTCGND A2 // use this as DS1307 breakout ground 
@@ -100,6 +113,12 @@ uint64_t mask;
 #define FLASHDELAY 250  // delay for startup "flashWords" sequence
 #define SHIFTDELAY 100   // controls color shifting speed
 
+#define CLOCKWIDTH (17)  // hours (3+1+3+1=8), colon (2), minutes (3+1+3) with spaces in between
+#define CLOCKHEIGHT 5
+byte clockBuffer[CLOCKHEIGHT][CLOCKWIDTH];
+byte screenBuffer[8][8];
+int clockX;
+int clockY;
 
 RTC_DS1307 RTC; // Establish clock object
 DST_RTC dst_rtc; // DST object
@@ -112,7 +131,7 @@ int j;   // an integer for the color shifting effect
 // https://en.wikipedia.org/wiki/Daylight_saving_time_by_country
 // Use 1 if you observe DST, 0 if you don't. This is programmed for DST in the US / Canada. If your territory's DST operates differently,
 // you'll need to modify the code in the calcTheTime() function to make this work properly.
-//#define OBSERVE_DST 1
+#define OBSERVE_DST 1
 
 
 // Parameter 1 = number of pixels in strip
@@ -130,6 +149,26 @@ Adafruit_NeoMatrix matrix = Adafruit_NeoMatrix(8, 8, NEOPIN,
                             NEO_MATRIX_ROWS + NEO_MATRIX_PROGRESSIVE,
                             NEO_GRB         + NEO_KHZ800);
 
+// Colors to scale from night to full sun
+uint16_t screenPalette[] = {
+  matrix.Color(0, 0, 0),       // 0 black
+  matrix.Color(68, 2, 40),     // 1 purple
+  matrix.Color(121, 6, 10),    // 2 dark-red
+  matrix.Color(180, 64, 16),   // 3 orangetone
+  matrix.Color(188, 53, 0),    // 4 rosy brown
+  matrix.Color(226, 88, 34),   // 5 flame
+  matrix.Color(255, 0, 77),    // 6 red
+  matrix.Color(255, 147,41),   // 7 candle, http://planetpixelemporium.com/tutorialpages/light.html
+  matrix.Color(255, 119, 168), // 8 pink
+  matrix.Color(255, 204, 170), // 9 peach
+  matrix.Color(255, 214, 170), // 10 100W tungsten
+  matrix.Color(255, 241, 232), // 11 white
+};
+
+#define PICO_BLACK 0
+#define BROWN_COLOR 4
+#define CANDLE_COLOR 7
+#define PICO_WHITE ((sizeof(screenPalette) / sizeof(uint16_t)) - 1)
 
 void setup() {
   // put your setup code here, to run once:
@@ -165,6 +204,12 @@ void setup() {
     RTC.adjust(standardTime);
   }
 
+  // Clear screen buffer
+  for (int sy=0; sy < 8; sy++) {
+    for (int sx=0; sx < 8; sx++) {
+      screenBuffer[sy][sx] = 0; //(sx + sy * 8) % (sizeof(screenPalette)/sizeof(uint16_t));
+    }
+  }
 
   matrix.begin();
   matrix.setBrightness(DAYBRIGHTNESS);
@@ -172,11 +217,11 @@ void setup() {
   matrix.show();
 
   // startup sequence... do colorwipe?
-  // delay(500);
-  // rainbowCycle(20);
-  delay(500);
-  flashWords(); // briefly flash each word in sequence
-  delay(500);
+  //delay(500);
+  //rainbowCycle(20);
+  //delay(500);
+  //flashWords(); // briefly flash each word in sequence
+  //delay(500);
 }
 
 void loop() {
@@ -185,14 +230,15 @@ void loop() {
   // get the time
   theTime = dst_rtc.calculateTime(RTC.now()); // takes into account DST
   // add 2.5 minutes to get better estimates
-  theTime = theTime.unixtime() + 150;
+  //theTime = theTime.unixtime() + 150;
 
   adjustBrightness();
-  displayTime();
+  //displayTime();
 
   //mode_moon(); // uncomment to show moon mode instead!
-
+  scrollTime();
 
 }
+
 
 

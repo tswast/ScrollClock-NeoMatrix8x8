@@ -13,3 +13,4 @@ void adjustBrightness() {
     matrix.setBrightness(DAYBRIGHTNESS);
   }
 }
+
